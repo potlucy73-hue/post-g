@@ -33,18 +33,45 @@ Rules:
 
 // --- DATABASE KEYS (localStorage) ---
 const DB_KEYS = {
-  WEBSITES: 'cs_websites_v5',
-  GEMINI_KEYS: 'cs_geminiKeys_v5',
-  KEYWORDS: 'cs_keywords_v5',
-  SCHEDULES: 'cs_schedules_v5',
-  STATS: 'cs_stats_v5'
+  WEBSITES: 'cs_websites_v6',
+  GEMINI_KEYS: 'cs_geminiKeys_v6',
+  KEYWORDS: 'cs_keywords_v6',
+  SCHEDULES: 'cs_schedules_v6',
+  STATS: 'cs_stats_v6'
 };
 
+// --- PRE-LOADED DATA (Tumhari details) ---
+const PRELOADED_SITE_ID = 'site_flavorzing_preload';
+
+const PRELOADED_WEBSITES = [
+  {
+    id: PRELOADED_SITE_ID,
+    name: 'FlavorZing (Preloaded)',
+    url: 'https://flavorzing.com',
+    user: 'hh',
+    pass: 'Y1zI8Qm58IRF q10V16GloCpo' 
+  }
+];
+
+const PRELOADED_KEYS = [
+  'AIzaSyBHUXFhDHf_j2_-PRWizrEoz1bm6-2i_yU' 
+];
+
+const PRELOADED_SCHEDULES = [
+  {
+    id: 'sch_flavorzing_preload',
+    siteId: PRELOADED_SITE_ID,
+    postsPerDay: 5, // Default 5 par set hai, tum change kar lena
+    isRunning: false // Shuru mein Paused hai
+  }
+];
+
+
 // --- Custom Hook for localStorage ---
-// (Isse state save rehta hai)
 function usePersistentState(key, defaultValue) {
   const [state, setState] = useState(() => {
     const storedValue = localStorage.getItem(key);
+    // Agar pehle se save hai to wo use karo, warna default (preloaded)
     return storedValue ? JSON.parse(storedValue) : defaultValue;
   });
 
@@ -61,21 +88,20 @@ const App = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   
-  // --- New Multi-Config State ---
-  const [websites, setWebsites] = usePersistentState(DB_KEYS.WEBSITES, []);
-  const [geminiKeys, setGeminiKeys] = usePersistentState(DB_KEYS.GEMINI_KEYS, []);
+  // --- New Multi-Config State (Defaults ab preloaded hain) ---
+  const [websites, setWebsites] = usePersistentState(DB_KEYS.WEBSITES, PRELOADED_WEBSITES);
+  const [geminiKeys, setGeminiKeys] = usePersistentState(DB_KEYS.GEMINI_KEYS, PRELOADED_KEYS);
   const [keywords, setKeywords] = usePersistentState(DB_KEYS.KEYWORDS, []);
-  const [schedules, setSchedules] = usePersistentState(DB_KEYS.SCHEDULES, []);
+  const [schedules, setSchedules] = usePersistentState(DB_KEYS.SCHEDULES, PRELOADED_SCHEDULES);
   const [stats, setStats] = usePersistentState(DB_KEYS.STATS, {}); // { 'siteId_2025-11-14': 5 }
 
   const [logs, setLogs] = useState([]);
   const logContainerRef = useRef(null);
   
-  // --- API Key Failover Logic ---
   const currentKeyIndex = useRef(0);
 
   useEffect(() => {
-    addLog('System Ready. Awaiting commands.', 'system');
+    addLog('System Ready. FlavorZing & API Key pre-loaded.', 'system');
   }, []);
 
   useEffect(() => {
@@ -102,8 +128,6 @@ const App = () => {
       }
     }
   };
-
-  // --- Core API Functions (Ab ye parameters lete hain) ---
 
   // 1. GENERATE CONTENT (with API Failover)
   const generateRecipeContent = async (title, attempt = 0) => {
@@ -140,9 +164,7 @@ const App = () => {
       
     } catch (e) {
       addLog(`API Key ${currentKeyIndex.current + 1} failed: ${e.message}. Switching key...`, 'error');
-      // Switch key
       currentKeyIndex.current = (currentKeyIndex.current + 1) % geminiKeys.length;
-      // Retry
       return generateRecipeContent(title, attempt + 1);
     }
   };
@@ -150,7 +172,7 @@ const App = () => {
   // 2. IMAGE HANDLER (Ab ye config leta hai)
   const handleImages = async (query, siteConfig) => {
     addLog(`Searching images for: ${query}...`, 'info');
-    // Note: Google Search API ab bhi hardcoded hai. Isko bhi siteConfig me daal sakte hain.
+    // Google Search API keys abhi bhi hardcoded hain
     const GOOGLE_API_KEY = 'AIzaSyDMfAv6gP6Uzldn68Y-LKLLTzS1tx5n1TU';     
     const SEARCH_ENGINE_ID = '35d066ed52c084df9';   
 
@@ -262,7 +284,6 @@ const App = () => {
 
   // --- Main Processing Function (Ye ab scheduler use karega) ---
   const processSingleKeyword = async (keyword) => {
-    // 1. Keyword ko processing mark karo
     setKeywords(prev => prev.map(k => k.id === keyword.id ? { ...k, status: 'processing' } : k));
     
     const siteConfig = websites.find(w => w.id === keyword.siteId);
@@ -281,7 +302,6 @@ const App = () => {
         setKeywords(prev => prev.map(k => k.id === keyword.id ? { ...k, status: 'completed', link: link } : k));
         addLog(`Published: ${keyword.text} to ${siteConfig.name}`, 'success');
         
-        // Stats update karo
         const today = new Date().toISOString().split('T')[0];
         const statKey = `${siteConfig.id}_${today}`;
         setStats(prev => ({
@@ -312,11 +332,10 @@ const App = () => {
             continue;
         }
 
-        // Check if any other post is already processing
         const isProcessing = keywords.some(k => k.status === 'processing');
         if (isProcessing) {
              addLog('Another task is already processing. Waiting...', 'info');
-             return; // Ek waqt me ek
+             return; 
         }
 
         const keywordToProcess = keywords.find(k => k.siteId === schedule.siteId && k.status === 'pending');
@@ -324,7 +343,6 @@ const App = () => {
         if (keywordToProcess) {
             addLog(`Quota not met for ${siteConfig.name}. Processing keyword: ${keywordToProcess.text}`, 'info');
             await processSingleKeyword(keywordToProcess);
-            // Ek process ke baad ruk jao, agla interval check karega
             break; 
         } else {
             addLog(`No pending keywords found for ${siteConfig.name}.`, 'info');
@@ -337,9 +355,8 @@ const App = () => {
     let interval;
     if (isRunning) {
         addLog('System Started. Scheduler is active.', 'success');
-        // Har 5 minute me check karo (Browser me isse kam unreliable hota hai)
-        interval = setInterval(runScheduler, 5 * 60 * 1000); // 5 minutes
-        runScheduler(); // Pehli dafa foran check karo
+        interval = setInterval(runScheduler, 5 * 60 * 1000); // Har 5 minute
+        runScheduler(); 
     } else {
         addLog('System Stopped. Scheduler is paused.', 'system');
     }
@@ -366,12 +383,10 @@ const App = () => {
             <div className="bg-slate-800 p-6 rounded border border-slate-700 shadow-xl">
                 <h3 className="font-bold mb-4 text-xl text-green-400">Welcome to ContentStack OS</h3>
                 <p className="text-slate-400 text-sm mb-4">
-                    Ye tumhara central control panel hai.
-                    1. Pehle "API Keys" me Gemini keys add karo.
-                    2. Phir "Websites" me apni WordPress sites add karo.
-                    3. Phir "Keywords" me titles add karke website assign karo.
-                    4. Akhir me "Scheduler" me daily post limit set karo.
-                    5. Jab sab set ho jaye, to sidebar me "Start System" ka button daba do.
+                    Tumhari 'FlavorZing' site aur API key pehle se loaded hain.
+                    1. Seedha "Keywords" tab me jao aur titles add karo.
+                    2. Phir "Scheduler" tab me daily post limit set karke "Run" dabao.
+                    3. Jab sab set ho jaye, to sidebar me "Start System" ka button daba do.
                 </p>
                 <div className="bg-slate-900 rounded p-4 border border-slate-700">
                     <h4 className="font-bold mb-2">Today's Stats</h4>
@@ -410,7 +425,6 @@ const App = () => {
         }
         const newSite = { id: `site_${Date.now()}`, name, url, user, pass };
         setWebsites(prev => [...prev, newSite]);
-        // Is site ke liye default schedule bana do
         setSchedules(prev => [...prev, { id: `sch_${Date.now()}`, siteId: newSite.id, postsPerDay: 0, isRunning: false }]);
         addLog(`Website added: ${name}`, 'success');
         setName(''); setUrl(''); setUser(''); setPass('');
@@ -421,7 +435,7 @@ const App = () => {
             <div className="md:col-span-1 bg-slate-800 p-6 rounded border border-slate-700 shadow-xl">
                 <h3 className="font-bold mb-4 text-xl text-green-400">Add New Website</h3>
                 <div className="space-y-4">
-                    <input value={name} onChange={e=>setName(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded p-2" placeholder="Site Name (e.g. FlavorZing)" />
+                    <input value={name} onChange={e=>setName(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded p-2" placeholder="Site Name (e.g. Roblox Site)" />
                     <input value={url} onChange={e=>setUrl(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded p-2" placeholder="WordPress URL (https://...)" />
                     <input value={user} onChange={e=>setUser(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded p-2" placeholder="WP Username" />
                     <input value={pass} onChange={e=>setPass(e.target.value)} type="password" className="w-full bg-slate-900 border border-slate-600 rounded p-2" placeholder="WP Application Password" />
