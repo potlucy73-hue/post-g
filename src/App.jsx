@@ -370,7 +370,7 @@ const App = () => {
                     <div className="max-w-5xl mx-auto bg-slate-800 rounded border border-slate-700 overflow-hidden">
                         <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
                             <h3 className="font-bold">Queue</h3>
-                            <button onClick={()=>setQueue([])} className="text-red-400 text-sm flex items-center gap-1"><Trash2 size={16}/> Clear</button>
+                            <button onClick={()=>{setQueue([]); setStats({total: 0, success: 0, failed: 0});}} className="text-red-400 text-sm flex items-center gap-1"><Trash2 size={16}/> Clear</button>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm">
@@ -379,8 +379,8 @@ const App = () => {
                                     {queue.map(item => (
                                         <tr key={item.id}>
                                             <td className="p-4 font-medium text-white">{item.title}</td>
-                                            <td className="p-4"><span className={`px-2 py-1 rounded text-xs font-bold uppercase ${item.status==='completed'?'bg-green-900 text-green-300':item.status==='failed'?'bg-red-900 text-red-300':'bg-slate-700'}`}>{item.status}</span></td>
-                                            <td className="p-4">{item.link ? <a href={item.link} target="_blank" className="text-blue-400 underline">View</a> : item.error ? <span className="text-red-400" title={item.error}>Error</span> : '-'}</td>
+                                            <td className="p-4"><span className={`px-2 py-1 rounded text-xs font-bold uppercase ${item.status==='completed'?'bg-green-900 text-green-300':item.status==='failed'?'bg-red-900 text-red-300':item.status==='processing'?'bg-blue-900 text-blue-300':'bg-slate-700'}`}>{item.status}</span></td>
+                                            <td className="p-4">{item.link ? <a href={item.link} target="_blank" className="text-blue-400 underline">View</a> : item.error ? <span className="text-red-400" title={item.error}>{item.error}</span> : '-'}</td>
                                         </tr>
                                     ))}
                                 </tbody>
