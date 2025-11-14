@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   LayoutDashboard, Settings, ListTodo, Activity, PlayCircle, 
-  PauseCircle, Trash2, CheckCircle, ChevronLeft, Menu, ExternalLink
+  PauseCircle, Trash2, CheckCircle, ChevronLeft, Menu
 } from 'lucide-react';
 
 // --- SYSTEM PROMPT ---
@@ -59,16 +59,16 @@ const App = () => {
 
   useEffect(() => {
     setConfig(DEFAULT_CONFIG);
-    const localQueue = localStorage.getItem('rab_queue_v4');
-    const localStats = localStorage.getItem('rab_stats_v4');
+    const localQueue = localStorage.getItem('rab_queue_v6');
+    const localStats = localStorage.getItem('rab_stats_v6');
     if (localQueue) setQueue(JSON.parse(localQueue));
     if (localStats) setStats(JSON.parse(localStats));
-    addLog('System Ready. Model: gemini-1.5-flash', 'system');
+    addLog('System Ready. Model: Gemini 2.5 Flash', 'system');
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('rab_queue_v4', JSON.stringify(queue));
-    localStorage.setItem('rab_stats_v4', JSON.stringify(stats));
+    localStorage.setItem('rab_queue_v6', JSON.stringify(queue));
+    localStorage.setItem('rab_stats_v6', JSON.stringify(stats));
   }, [queue, stats]);
 
   useEffect(() => {
@@ -85,18 +85,14 @@ const App = () => {
     return { 'Authorization': `Basic ${token}`, 'Content-Type': 'application/json' };
   };
 
-  // --- FIXED JSON PARSER ---
   const cleanAndParseJSON = (text) => {
     try {
-      // 1. Try direct parse
       return JSON.parse(text);
     } catch (e1) {
       try {
-        // 2. Try cleaning markdown blocks
         let cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
         return JSON.parse(cleanText);
       } catch (e2) {
-        // 3. Try extracting JSON object from text
         const match = text.match(/\{[\s\S]*\}/);
         if (match) return JSON.parse(match[0]);
         throw new Error("Invalid JSON format");
@@ -104,12 +100,15 @@ const App = () => {
     }
   };
 
-  // --- GENERATE CONTENT (UPDATED MODEL) ---
+  // --- GENERATE CONTENT (GEMINI 2.5) ---
   const generateRecipeContent = async (title) => {
     addLog(`Generating content for: ${title}...`, 'info');
+    
+    // Using Gemini 2.5 as requested
+    const model = 'gemini-2.5-flash-preview-09-2025';
+    
     try {
-      // Using gemini-1.5-flash (More stable)
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${config.geminiKey}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.geminiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -120,20 +119,24 @@ const App = () => {
       });
       
       const data = await res.json();
+      
+      if (data.error) {
+          console.error("Gemini Error:", data.error);
+          throw new Error(data.error.message || "Model Error");
+      }
+      
       if (!data.candidates?.[0]?.content) {
-        // Log the full error for debugging
-        console.error("Gemini Error Data:", data);
-        throw new Error(data.error?.message || "AI refused request (Safety/Block)");
+          throw new Error("Safety Block or Empty Response");
       }
       
       const jsonText = data.candidates[0].content.parts[0].text;
       return cleanAndParseJSON(jsonText);
+      
     } catch (e) {
-      throw new Error(`Gemini Error: ${e.message}`);
+      throw new Error(`Gemini 2.5 Error: ${e.message}`);
     }
   };
 
-  // --- IMAGE HANDLER ---
   const handleImages = async (query) => {
     if (!config.enableImages) return { featuredId: null, bodyUrls: [] };
     addLog(`Searching images for: ${query}...`, 'info');
@@ -175,7 +178,6 @@ const App = () => {
     }
   };
 
-  // --- CREATE RECIPE CARD ---
   const createWprmRecipe = async (recipeData, imageId) => {
     addLog('Creating Recipe Card...', 'info');
     try {
@@ -206,7 +208,6 @@ const App = () => {
     }
   };
 
-  // --- CREATE POST ---
   const createPost = async (recipeData, recipeId, featuredId, imageUrls) => {
     addLog('Publishing to WordPress...', 'info');
     let content = recipeData.article;
@@ -244,7 +245,6 @@ const App = () => {
     return data.link;
   };
 
-  // --- QUEUE WORKER ---
   const processQueueItem = useCallback(async () => {
     const pendingIndex = queue.findIndex(i => i.status === 'pending');
     if (pendingIndex === -1) {
@@ -350,11 +350,10 @@ const App = () => {
                 {activeView === 'settings' && (
                      <div className="max-w-2xl mx-auto bg-slate-800 rounded border border-slate-700 p-8 text-center">
                         <div className="flex justify-center mb-4"><CheckCircle size={64} className="text-green-500"/></div>
-                        <h3 className="font-bold text-2xl text-white mb-2">Pre-Configured</h3>
-                        <p className="text-slate-400 mb-6">Using hardcoded credentials.</p>
+                        <h3 className="font-bold text-2xl text-white mb-2">Configured</h3>
                         <div className="bg-slate-900 rounded p-4 text-left space-y-3 text-sm font-mono border border-slate-700">
                             <div className="flex justify-between"><span>WP URL:</span> <span className="text-green-400">{config.wpUrl}</span></div>
-                            <div className="flex justify-between"><span>Model:</span> <span className="text-yellow-400">gemini-1.5-flash</span></div>
+                            <div className="flex justify-between"><span>Model:</span> <span className="text-yellow-400">Gemini 2.5 Flash</span></div>
                         </div>
                     </div>
                 )}
@@ -394,4 +393,5 @@ const App = () => {
 };
 
 export default App;
+
 
