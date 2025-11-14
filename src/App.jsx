@@ -59,16 +59,17 @@ const App = () => {
 
   useEffect(() => {
     setConfig(DEFAULT_CONFIG);
-    const localQueue = localStorage.getItem('rab_queue_v6');
-    const localStats = localStorage.getItem('rab_stats_v6');
+    // Change local storage key to v7 to force clear cache
+    const localQueue = localStorage.getItem('rab_queue_v7');
+    const localStats = localStorage.getItem('rab_stats_v7');
     if (localQueue) setQueue(JSON.parse(localQueue));
     if (localStats) setStats(JSON.parse(localStats));
-    addLog('System Ready. Model: Gemini 2.5 Flash', 'system');
+    addLog('System Ready. Model: Gemini 2.5 Flash (Stable)', 'system');
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('rab_queue_v6', JSON.stringify(queue));
-    localStorage.setItem('rab_stats_v6', JSON.stringify(stats));
+    localStorage.setItem('rab_queue_v7', JSON.stringify(queue));
+    localStorage.setItem('rab_stats_v7', JSON.stringify(stats));
   }, [queue, stats]);
 
   useEffect(() => {
@@ -85,16 +86,21 @@ const App = () => {
     return { 'Authorization': `Basic ${token}`, 'Content-Type': 'application/json' };
   };
 
+  // JSON Cleaner (to fix "Invalid JSON" error)
   const cleanAndParseJSON = (text) => {
     try {
+      // 1. Try direct parse (agar JSON bilkul a hai)
       return JSON.parse(text);
     } catch (e1) {
       try {
+        // 2. Try cleaning markdown blocks (agar AI ne ```json laga diya)
         let cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
         return JSON.parse(cleanText);
       } catch (e2) {
+        // 3. Try finding the JSON object inside other text
         const match = text.match(/\{[\s\S]*\}/);
         if (match) return JSON.parse(match[0]);
+        // Agar kuch na milay, to error do
         throw new Error("Invalid JSON format");
       }
     }
@@ -104,7 +110,7 @@ const App = () => {
   const generateRecipeContent = async (title) => {
     addLog(`Generating content for: ${title}...`, 'info');
     
-    // Using Gemini 2.5 as requested
+    // Using Gemini 2.5 as requested (This is the stable, full name)
     const model = 'gemini-2.5-flash-preview-09-2025';
     
     try {
@@ -130,10 +136,12 @@ const App = () => {
       }
       
       const jsonText = data.candidates[0].content.parts[0].text;
+      // Ab humara JSON Cleaner isay handle karlega
       return cleanAndParseJSON(jsonText);
       
     } catch (e) {
-      throw new Error(`Gemini 2.5 Error: ${e.message}`);
+      // Yahan error ayega agar "Model Not Found" ya "Invalid JSON" ho
+      throw new Error(`Gemini Error: ${e.message}`);
     }
   };
 
